@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting to PayPal - My SEO King Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .redirect-card {
+            background: white;
+            border-radius: 20px;
+            padding: 50px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+        }
+        
+        .paypal-logo {
+            font-size: 60px;
+            color: #003087;
+            margin-bottom: 20px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e9ecef;
+            border-top: 4px solid #003087;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .plan-details {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .price {
+            font-size: 36px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .btn-paypal {
+            background: #0070ba;
+            color: white;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 18px;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .btn-paypal:hover {
+            background: #003087;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="redirect-card">
+        <div class="paypal-logo">
+            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="#003087">
+                <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797H9.22c-.535 0-.98.39-1.063.91l-.893 5.655a.772.772 0 0 1-.763.64l-2.06-.004-.007.003.011-.198h2.058z"/>
+            </svg>
+        </div>
+        
+        <h2>Redirecting to PayPal</h2>
+        <p class="text-muted">Please wait while we redirect you to complete your payment...</p>
+        
+        <div class="plan-details">
+            <h4>{{ plan_info.name }}</h4>
+            <div class="price">${{ "%.2f"|format(plan_info.price) }}</div>
+            <small class="text-muted">One-time payment</small>
+        </div>
+        
+        <div class="spinner"></div>
+        
+        <p class="text-muted small mb-4">
+            If you're not redirected automatically, click the button below:
+        </p>
+        
+        <!-- PayPal Form -->
+        <form action="{{ paypal_button_url }}" method="post" id="paypal-form">
+            <input type="hidden" name="cmd" value="_xclick">
+            <input type="hidden" name="business" value="{{ paypal_email }}">
+            <input type="hidden" name="item_name" value="{{ plan_info.name }} - My SEO King Tool">
+            <input type="hidden" name="item_number" value="{{ payment.plan }}">
+            <input type="hidden" name="amount" value="{{ plan_info.price }}">
+            <input type="hidden" name="currency_code" value="USD">
+            <input type="hidden" name="custom" value="{{ custom_data }}">
+            <input type="hidden" name="return" value="{{ return_url }}">
+            <input type="hidden" name="cancel_return" value="{{ cancel_url }}">
+            <input type="hidden" name="notify_url" value="{{ notify_url }}">
+            <input type="hidden" name="no_shipping" value="1">
+            <input type="hidden" name="no_note" value="1">
+            
+            <button type="submit" class="btn-paypal">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
+                    <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797H9.22c-.535 0-.98.39-1.063.91l-.893 5.655a.772.772 0 0 1-.763.64l-2.06-.004-.007.003.011-.198h2.058z"/>
+                </svg>
+                Pay with PayPal
+            </button>
+        </form>
+        
+        <p class="mt-4">
+            <a href="/pricing" class="text-muted">← Cancel and go back</a>
+        </p>
+    </div>
+    
+    <script>
+        // Auto-submit form after 2 seconds
+        setTimeout(function() {
+            document.getElementById('paypal-form').submit();
+        }, 2000);
+    </script>
+</body>
+</html>
