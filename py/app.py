@@ -1790,32 +1790,35 @@ def fix_db():
     except: 
         return "Err"
 
-# ==========================================
-# RAILWAY PRODUCTION START (CRITICAL)
+ ==========================================
+# RAILWAY PRODUCTION START (FLASK 3.0 COMPATIBLE)
 # ==========================================
 
-@app.before_first_request
-def create_tables():
-    """Auto-create database tables on first request"""
-    db.create_all()
-    print("✅ Database tables created/verified")
-    
-    # Create default admin user (only if no users exist)
-    if not User.query.filter_by(email='admin@myseokingtool.com').first():
-        try:
-            hashed = bcrypt.generate_password_hash('AdminPassword123!').decode('utf-8')
-            admin = User(
-                username='admin',
-                email='admin@myseokingtool.com',
-                password_hash=hashed,
-                is_admin=True,
-                tier='enterprise'
-            )
-            db.session.add(admin)
-            db.session.commit()
-            print("✅ Default admin user created: admin@myseokingtool.com / AdminPassword123!")
-        except Exception as e:
-            print(f"⚠️ Admin user creation skipped: {e}")
+def init_db():
+    """Initialize database tables and create default admin"""
+    with app.app_context():
+        db.create_all()
+        print("✅ Database tables created/verified")
+        
+        # Create default admin user (only if no users exist)
+        if not User.query.filter_by(email='admin@myseokingtool.com').first():
+            try:
+                hashed = bcrypt.generate_password_hash('AdminPassword123!').decode('utf-8')
+                admin = User(
+                    username='admin',
+                    email='admin@myseokingtool.com',
+                    password_hash=hashed,
+                    is_admin=True,
+                    tier='enterprise'
+                )
+                db.session.add(admin)
+                db.session.commit()
+                print("✅ Default admin user created: admin@myseokingtool.com / AdminPassword123!")
+            except Exception as e:
+                print(f"⚠️ Admin user creation skipped: {e}")
+
+# Initialize database when app starts
+init_db()
 
 if __name__ == "__main__":
     # For local testing only
