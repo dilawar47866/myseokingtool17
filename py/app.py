@@ -316,77 +316,30 @@ def webmanifest():
 # ==========================================
 # 4. PAGE ROUTES
 # ==========================================
+@app.route('/')
+def landing(): 
+    if current_user.is_authenticated: 
+        return redirect(url_for('dashboard'))
+    return render_template('landing.html')
+
+app.add_url_rule('/', endpoint='home', view_func=landing)
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """Dashboard - Safe version that won't crash"""
-    try:
-        recent = Content.query.filter_by(user_id=current_user.id).order_by(Content.updated_at.desc()).limit(5).all()
-        total = Content.query.filter_by(user_id=current_user.id).count()
-        words = db.session.query(db.func.sum(Content.word_count)).filter_by(user_id=current_user.id).scalar() or 0
-        
-        avg_score = 0
-        scores = [c.seo_score for c in Content.query.filter_by(user_id=current_user.id).all()]
-        if scores: 
-            avg_score = sum(scores) / len(scores)
+    recent = Content.query.filter_by(user_id=current_user.id).order_by(Content.updated_at.desc()).limit(5).all()
+    total = Content.query.filter_by(user_id=current_user.id).count()
+    words = db.session.query(db.func.sum(Content.word_count)).filter_by(user_id=current_user.id).scalar() or 0
+    
+    avg_score = 0
+    scores = [c.seo_score for c in Content.query.filter_by(user_id=current_user.id).all()]
+    if scores: 
+        avg_score = sum(scores) / len(scores)
 
-        return render_template('index.html', 
-                             recent_content=recent, 
-                             total_content=total, 
-                             total_words=words, 
-                             avg_score=round(avg_score, 1), 
-                             limits=current_user.get_limits())
-    except Exception as e:
-        print(f"Dashboard error: {e}")
-        return render_template('index.html', 
-                             recent_content=[], 
-                             total_content=0, 
-                             total_words=0, 
-                             avg_score=0, 
-                             limits={'ai_requests_per_month': 50})
-    
-    try:
-        # Try to get recent content
-        recent_content = Content.query.filter_by(user_id=current_user.id).order_by(Content.updated_at.desc()).limit(5).all()
-    except Exception as e:
-        print(f"Error fetching recent content: {e}")
-    
-    try:
-        # Try to get total content count
-        total_content = Content.query.filter_by(user_id=current_user.id).count()
-    except Exception as e:
-        print(f"Error counting content: {e}")
-    
-    try:
-        # Try to get total words
-        words_result = db.session.query(db.func.sum(Content.word_count)).filter_by(user_id=current_user.id).scalar()
-        total_words = int(words_result) if words_result else 0
-    except Exception as e:
-        print(f"Error calculating words: {e}")
-    
-    try:
-        # Try to calculate average SEO score
-        all_content = Content.query.filter_by(user_id=current_user.id).all()
-        scores = [c.seo_score for c in all_content if hasattr(c, 'seo_score') and c.seo_score is not None and c.seo_score > 0]
-        if scores:
-            avg_score = round(sum(scores) / len(scores), 1)
-    except Exception as e:
-        print(f"Error calculating avg score: {e}")
-    
-    try:
-        # Try to get user limits
-        if hasattr(current_user, 'get_limits'):
-            limits = current_user.get_limits()
-    except Exception as e:
-        print(f"Error getting limits: {e}")
-    
-    # Render template with all safe values
-    return render_template('index.html', 
-                         recent_content=recent_content, 
-                         total_content=total_content, 
-                         total_words=total_words, 
-                         avg_score=avg_score, 
-                         limits=limits)
+    return render_template('index.html', recent_content=recent, total_content=total, 
+                         total_words=words, avg_score=round(avg_score, 1), 
+                         limits=current_user.get_limits())
+
 @app.route('/editor')
 @login_required
 def editor():
@@ -437,59 +390,6 @@ def sitemap_generator_page():
 @login_required
 def robots_generator_page():
     return render_template('robots_generator.html')
-
-# ==========================================
-# PASSWORD CHANGE ROUTE
-# ==========================================
- ==========================================
-# PASSWORD CHANGE ROUTE
-# ==========================================
-@app.route('/change-password', methods=['GET', 'POST'])
-@login_required
-def change_password():
-    if request.method == 'POST':
-        try:
-            data = request.get_json() if request.is_json else request.form
-            current_password = data.get('current_password')
-            new_password = data.get('new_password')
-            confirm_password = data.get('confirm_password')
-            
-            if not current_password or not new_password or not confirm_password:
-                return jsonify({'error': 'All fields are required'}), 400
-            
-            if not current_user.check_password(current_password):
-                return jsonify({'error': 'Current password is incorrect'}), 401
-            
-            if new_password != confirm_password:
-                return jsonify({'error': 'New passwords do not match'}), 400
-            
-            if len(new_password) < 8:
-                return jsonify({'error': 'Password must be at least 8 characters'}), 400
-            
-            current_user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'Password changed successfully!'})
-            
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    
-    return render_template('change_password.html')
-
-# ==========================================
-# TECHNICAL SEO ROUTES
-# ==========================================
-@app.route('/robots.txt')
-def robots_txt():
-    lines = [
-        "User-agent: *", 
-        "Disallow: /dashboard", 
-        "Disallow: /editor", 
-        "Disallow: /admin", 
-        "Disallow: /profile", 
-        f"Sitemap: {request.url_root}sitemap.xml"
-    ]
-    return "\n".join(lines), 200, {'Content-Type': 'text/plain'}
 
 @app.route('/robots.txt')
 def robots_txt():
