@@ -316,25 +316,34 @@ def webmanifest():
 # ==========================================
 # 4. PAGE ROUTES
 # ==========================================
-@app.route('/')
-def landing(): 
-    if current_user.is_authenticated: 
-        return redirect(url_for('dashboard'))
-    return render_template('landing.html')
-
-app.add_url_rule('/', endpoint='home', view_func=landing)
-
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """Dashboard with full error handling - will never crash"""
-    
-    # Safe defaults
-    recent_content = []
-    total_content = 0
-    total_words = 0
-    avg_score = 0
-    limits = {'ai_requests_per_month': 50}
+    """Dashboard - Safe version that won't crash"""
+    try:
+        recent = Content.query.filter_by(user_id=current_user.id).order_by(Content.updated_at.desc()).limit(5).all()
+        total = Content.query.filter_by(user_id=current_user.id).count()
+        words = db.session.query(db.func.sum(Content.word_count)).filter_by(user_id=current_user.id).scalar() or 0
+        
+        avg_score = 0
+        scores = [c.seo_score for c in Content.query.filter_by(user_id=current_user.id).all()]
+        if scores: 
+            avg_score = sum(scores) / len(scores)
+
+        return render_template('index.html', 
+                             recent_content=recent, 
+                             total_content=total, 
+                             total_words=words, 
+                             avg_score=round(avg_score, 1), 
+                             limits=current_user.get_limits())
+    except Exception as e:
+        print(f"Dashboard error: {e}")
+        return render_template('index.html', 
+                             recent_content=[], 
+                             total_content=0, 
+                             total_words=0, 
+                             avg_score=0, 
+                             limits={'ai_requests_per_month': 50})
     
     try:
         # Try to get recent content
