@@ -15,41 +15,50 @@ from sqlalchemy import text
 from youtube_transcript_api import YouTubeTranscriptApi
 from collections import Counter
 from fpdf import FPDF
-from threading import Thread  # <--- ADDED THIS IMPORT
+from threading import Thread
 
 # ==========================================
-# 1. CONFIGURATION
+# 1. CONFIGURATION - RAILWAY READY
 # ==========================================
 load_dotenv()
+
 app = Flask(__name__)
 
-# Database
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///myseotoolver5.db').replace('postgres://', 'postgresql://')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-me')
+# Secret Key
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-me-in-production')
 
-# --- UPDATED EMAIL CONFIGURATION (Hostinger SSL - Async Ready) ---
+# Database Configuration (Works on Railway + Local)
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL or 'sqlite:///dev.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Email Configuration (Hostinger SSL)
 app.config['MAIL_SERVER'] = 'smtp.hostinger.com'
-app.config['MAIL_PORT'] = 465           # Changed to 465 (Implicit SSL)
-app.config['MAIL_USE_TLS'] = False      # Must be False for 465
-app.config['MAIL_USE_SSL'] = True       # Must be True for 465
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'support@myseokingtool.com')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = ('My SEO King Tool Team', app.config['MAIL_USERNAME'])
 app.config['MAIL_DEBUG'] = False
 
-# --- PAYPAL CONFIGURATION ---
+# PayPal Configuration
 PAYPAL_EMAIL = os.environ.get('PAYPAL_EMAIL', 'your-paypal@email.com')
 
+# Initialize Extensions
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 mail = Mail(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
+# OpenAI Client
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-# --- GLOBAL TOOL LIST ---
+# Global Tool List
 TOOL_LIST = [
     'competitor-analyzer', 'keyword-research', 'sitemap-generator', 
     'robots-generator', 'image-seo', 'social-posts', 'alt-text-generator', 
@@ -61,7 +70,7 @@ TOOL_LIST = [
     'social-preview', 'keyword-density'
 ]
 
-# --- PIPED MIRRORS ---
+# Piped Mirror Instances
 PIPED_INSTANCES = [
     "https://pipedapi.kavin.rocks",
     "https://api.piped.privacy.com.de",
@@ -71,10 +80,10 @@ PIPED_INSTANCES = [
 ]
 
 # ==========================================
-# 1.5 ASYNC EMAIL HELPER (FIXES 502 ERRORS)
+# 1.5 ASYNC EMAIL HELPER (PREVENTS 502 ERRORS)
 # ==========================================
 def send_async_email(app_obj, msg):
-    """Background task to send email without freezing the browser"""
+    """Background task to send email without blocking requests"""
     with app_obj.app_context():
         try:
             mail.send(msg)
@@ -83,13 +92,10 @@ def send_async_email(app_obj, msg):
             print(f"❌ Background email failed: {e}")
 
 def send_email_background(subject, recipient, body):
-    """Call this function to send emails safely"""
+    """Send emails in background to prevent timeouts"""
     msg = Message(subject, recipients=[recipient])
     msg.body = body
-    
-    # Pass the actual app object to the thread
     app_obj = current_app._get_current_object()
-    
     thr = Thread(target=send_async_email, args=[app_obj, msg])
     thr.start()
 
@@ -128,7 +134,6 @@ class Content(db.Model):
     word_count = db.Column(db.Integer, default=0)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-# --- PAYMENT MODEL (NEW) ---
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -136,7 +141,7 @@ class Payment(db.Model):
     payer_email = db.Column(db.String(120))
     amount = db.Column(db.Float, default=0)
     plan = db.Column(db.String(50))
-    status = db.Column(db.String(20), default='pending')  # pending, completed, rejected
+    status = db.Column(db.String(20), default='pending')
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     verified_at = db.Column(db.DateTime, nullable=True)
@@ -231,7 +236,7 @@ def pricing():
 def profile(): 
     return render_template('profile.html')
 
-# --- DEDICATED TOOL PAGE ROUTES ---
+# Dedicated Tool Pages
 @app.route('/article-wizard')
 @login_required
 def article_wizard_page(): 
@@ -260,7 +265,7 @@ def sitemap_generator_page():
 def robots_generator_page():
     return render_template('robots_generator.html')
 
-# --- TECHNICAL SEO ROUTES ---
+# Technical SEO Routes
 @app.route('/robots.txt')
 def robots_txt():
     lines = [
@@ -296,7 +301,7 @@ def login():
         user = User.query.filter_by(email=data.get('email').lower()).first()
         if user and user.check_password(data.get('password')):
             if not user.is_active: 
-                return jsonify({'error': 'Banned'}), 403
+                return jsonify({'error': 'Account banned'}), 403
             login_user(user)
             return jsonify({'success': True, 'redirect': '/dashboard'})
         return jsonify({'error': 'Invalid credentials'}), 401
@@ -310,10 +315,12 @@ def signup():
         try:
             data = request.get_json() if request.is_json else request.form
             if User.query.filter_by(email=data.get('email').lower()).first(): 
-                return jsonify({'error': 'Email exists'}), 400
+                return jsonify({'error': 'Email already exists'}), 400
             
             hashed = bcrypt.generate_password_hash(data.get('password')).decode('utf-8')
             user = User(username=data.get('username'), email=data.get('email').lower(), password_hash=hashed)
+            
+            # First user becomes admin
             if User.query.count() == 0: 
                 user.is_admin = True
             
@@ -321,13 +328,12 @@ def signup():
             db.session.commit()
             login_user(user)
 
-            # --- SENDING EMAIL IN BACKGROUND (Prevents 502 Timeout) ---
+            # Send welcome email in background
             try:
-                body = f"Hi {user.username},\n\nWelcome to My SEO King Tool.\n\nCheers,\nTeam"
+                body = f"Hi {user.username},\n\nWelcome to My SEO King Tool!\n\nCheers,\nTeam"
                 send_email_background("Welcome to MySEO King! 👑", user.email, body)
             except: 
                 pass
-            # -----------------------------------------------------------
 
             return jsonify({'success': True, 'redirect': '/dashboard'})
         except Exception as e: 
@@ -341,7 +347,7 @@ def logout():
     return redirect('/')
 
 # ==========================================
-# 6. ADMIN & PAYMENT
+# 6. ADMIN & PAYMENT ROUTES
 # ==========================================
 @app.route('/admin')
 @login_required
@@ -349,7 +355,6 @@ def admin():
     if not getattr(current_user, 'is_admin', False): 
         return redirect('/dashboard')
     users = User.query.order_by(User.id.desc()).all()
-    # Get pending payments for admin review
     pending_payments = Payment.query.filter_by(status='pending').order_by(Payment.created_at.desc()).all()
     return render_template('admin.html', users=users, total_content=Content.query.count(), pending_payments=pending_payments)
 
@@ -411,14 +416,10 @@ def payment_success(plan_name):
     db.session.commit()
     return redirect('/dashboard')
 
-# ==========================================
-# PAYMENT VERIFICATION API
-# ==========================================
-
+# Payment Verification API
 @app.route('/api/verify-payment', methods=['POST'])
 @login_required
 def api_verify_payment():
-    """API endpoint for submitting PayPal transaction ID"""
     try:
         data = request.get_json()
         transaction_id = data.get('transaction_id', '').strip().upper()
@@ -430,14 +431,13 @@ def api_verify_payment():
         if len(transaction_id) < 10:
             return jsonify({'success': False, 'error': 'Invalid Transaction ID format'}), 400
         
-        # Check if this transaction already exists and is completed
         existing = Payment.query.filter_by(payment_id=transaction_id).first()
         if existing:
             if existing.status == 'completed':
                 return jsonify({
                     'success': False, 
                     'already_exists': True,
-                    'message': 'This transaction has already been verified and processed.'
+                    'message': 'This transaction has already been verified.'
                 }), 400
             elif existing.status == 'pending':
                 return jsonify({
@@ -446,7 +446,6 @@ def api_verify_payment():
                     'message': 'This transaction is already pending verification.'
                 }), 400
         
-        # Find or create pending payment for this user
         pending_payment = Payment.query.filter_by(
             user_id=current_user.id,
             status='pending',
@@ -454,17 +453,15 @@ def api_verify_payment():
         ).order_by(Payment.created_at.desc()).first()
         
         if pending_payment:
-            # Update existing pending payment
             pending_payment.payment_id = transaction_id
             pending_payment.payer_email = email
             pending_payment.notes = f'Manual submission - awaiting verification. Submitted: {datetime.utcnow()}'
         else:
-            # Create new payment record for verification
             pending_payment = Payment(
                 user_id=current_user.id,
                 payment_id=transaction_id,
                 payer_email=email,
-                amount=0,  # Will be verified by admin
+                amount=0,
                 plan='pending_verification',
                 status='pending',
                 notes=f'Manual submission - awaiting verification. Submitted: {datetime.utcnow()}'
@@ -473,7 +470,6 @@ def api_verify_payment():
         
         db.session.commit()
         
-        # Notify admin via email
         admin_body = f"""🔔 New Payment Verification Request
 
 User Details:
@@ -500,11 +496,9 @@ Please verify this transaction in PayPal and approve/reject in admin panel:
         print(f"Payment verification error: {e}")
         return jsonify({'success': False, 'error': 'An error occurred. Please try again.'}), 500
 
-# --- ADMIN: APPROVE PAYMENT ---
 @app.route('/admin/payment/<int:payment_id>/approve', methods=['POST'])
 @login_required
 def admin_approve_payment(payment_id):
-    """Admin endpoint to approve a pending payment"""
     if not getattr(current_user, 'is_admin', False):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -515,19 +509,16 @@ def admin_approve_payment(payment_id):
         if payment.status != 'pending':
             return jsonify({'error': 'Payment is not pending'}), 400
         
-        # Update payment status
         payment.status = 'completed'
         payment.verified_at = datetime.utcnow()
         payment.amount = data.get('amount', 0)
         payment.plan = data.get('plan', 'pro king')
         payment.notes = f"{payment.notes}\nApproved by admin on {datetime.utcnow()}"
         
-        # Upgrade user
         user = User.query.get(payment.user_id)
         if user:
             user.tier = data.get('plan', 'pro king')
             
-            # Notify user via email
             user_body = f"""🎉 Payment Verified - Account Upgraded!
 
 Hi {user.username},
@@ -551,11 +542,9 @@ My SEO King Tool Team
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# --- ADMIN: REJECT PAYMENT ---
 @app.route('/admin/payment/<int:payment_id>/reject', methods=['POST'])
 @login_required
 def admin_reject_payment(payment_id):
-    """Admin endpoint to reject a pending payment"""
     if not getattr(current_user, 'is_admin', False):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -568,11 +557,9 @@ def admin_reject_payment(payment_id):
         
         reason = data.get('reason', 'Transaction could not be verified')
         
-        # Update payment status
         payment.status = 'rejected'
         payment.notes = f"{payment.notes}\nRejected by admin on {datetime.utcnow()}. Reason: {reason}"
         
-        # Notify user via email
         user = User.query.get(payment.user_id)
         if user:
             user_body = f"""⚠️ Payment Verification Issue
@@ -598,11 +585,9 @@ My SEO King Tool Team
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# --- GET PENDING PAYMENTS (for admin dashboard) ---
 @app.route('/api/admin/pending-payments', methods=['GET'])
 @login_required
 def api_get_pending_payments():
-    """Get all pending payments for admin review"""
     if not getattr(current_user, 'is_admin', False):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -638,7 +623,6 @@ def tool_view(tool_name):
         flash("Pro Feature!", "warning")
         return redirect('/pricing')
     
-    # Handle Manual Redirects
     if tool_name == 'article-wizard': 
         return redirect('/article-wizard')
     if tool_name == 'alt-text-generator': 
@@ -662,14 +646,13 @@ for t in TOOL_LIST:
         app.add_url_rule(f'/{t}', endpoint=t.replace('-', '_'), view_func=lambda t=t: tool_view(t))
 
 # ==========================================
-# 8. API ENDPOINTS
+# 8. API ENDPOINTS (ALL YOUR TOOLS)
 # ==========================================
 
-# --- BULK WRITER API (Single Article - Prevents Timeout) ---
+# Bulk Writer API
 @app.route('/api/bulk-write-single', methods=['POST'])
 @login_required
 def api_bulk_write_single():
-    """Generate a single article - called multiple times from frontend"""
     if current_user.tier == 'free':
         return jsonify({'error': 'Upgrade to Pro for Bulk Writing!'}), 403
     
@@ -691,20 +674,18 @@ Write a comprehensive, SEO-optimized blog post about: "{keyword}"
 Requirements:
 - Tone: {tone}
 - Target word count: approximately {word_count} words
-- Start with an engaging introduction that hooks the reader
-- Use H2 (##) and H3 (###) headings to structure the content
-- Include actionable tips and practical advice
-- Add relevant examples where appropriate
-- End with a strong conclusion summarizing key points
-- Make it informative, engaging, and valuable for readers
-
-Format the article using Markdown.
+- Start with an engaging introduction
+- Use H2 (##) and H3 (###) headings
+- Include actionable tips
+- Add relevant examples
+- End with a strong conclusion
+- Format using Markdown
 """
         
         res = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are an expert SEO content writer who creates engaging, well-structured blog posts."},
+                {"role": "system", "content": "You are an expert SEO content writer."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=2000,
@@ -726,7 +707,7 @@ Format the article using Markdown.
     except Exception as e:
         return jsonify({'error': str(e), 'keyword': data.get('keyword', 'Unknown')}), 500
 
-# --- SITEMAP GENERATOR API ---
+# Sitemap Generator API
 @app.route('/api/generate-sitemap', methods=['POST'])
 @login_required
 def api_generate_sitemap():
@@ -811,7 +792,7 @@ def api_generate_sitemap():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# --- ROBOTS.TXT GENERATOR API ---
+# Robots.txt Generator API
 @app.route('/api/generate-robots', methods=['POST'])
 @login_required
 def api_generate_robots():
@@ -878,7 +859,7 @@ def api_generate_robots():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# --- DOWNLOAD SITEMAP FILE ---
+# Download Sitemap
 @app.route('/api/download-sitemap', methods=['POST'])
 @login_required
 def api_download_sitemap():
@@ -894,7 +875,7 @@ def api_download_sitemap():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# --- DOWNLOAD ROBOTS FILE ---
+# Download Robots
 @app.route('/api/download-robots', methods=['POST'])
 @login_required
 def api_download_robots():
@@ -910,7 +891,7 @@ def api_download_robots():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# --- BACKLINK BUILDER (SAFE OUTREACH) ---
+# Backlink Outreach
 @app.route('/api/backlink-outreach', methods=['POST'])
 @login_required
 def api_backlink_outreach():
@@ -922,14 +903,14 @@ def api_backlink_outreach():
     topic = d.get('topic')
     
     prompt = f"""
-    Write a high-conversion 'Guest Post' or 'Link Insertion' email pitch.
-    Target Website: {target_url}
-    My Topic: {topic}
-    
-    Tone: Professional but personal.
-    Subject Line: Catchy.
-    Body: Compliment their recent work, explain why my content adds value to them, and propose the link.
-    """
+Write a high-conversion guest post email pitch.
+Target Website: {target_url}
+My Topic: {topic}
+
+Tone: Professional but personal.
+Subject Line: Catchy.
+Body: Compliment their work, explain value, propose the link.
+"""
     try:
         res = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role":"system","content":"Outreach Expert"},{"role":"user","content":prompt}])
         current_user.ai_requests_this_month += 1
@@ -938,7 +919,7 @@ def api_backlink_outreach():
     except Exception as e: 
         return jsonify({'error': str(e)}), 500
 
-# --- PUBLIC AUDIT ---
+# Public Site Audit
 @app.route('/api/public-audit', methods=['POST'])
 def api_public_audit():
     try:
@@ -969,7 +950,7 @@ def api_public_audit():
     except: 
         return jsonify({'success': True, 'score': 42, 'issues': ['Server Response Timeout', 'Mobile Optimization Issues']})
 
-# --- PRO AUDIT ---
+# Pro Site Audit
 @app.route('/api/audit-site', methods=['POST'])
 @login_required
 def api_audit_site():
@@ -1024,6 +1005,7 @@ def api_audit_site():
     except Exception as e: 
         return jsonify({'error': f"Failed: {str(e)}"}), 500
 
+# Image Generator
 @app.route('/api/generate-image', methods=['POST'])
 @login_required
 def api_generate_image():
@@ -1039,6 +1021,7 @@ def api_generate_image():
     except Exception as e: 
         return jsonify({'error': str(e)}), 500
 
+# Content Humanizer
 @app.route('/api/humanize-text', methods=['POST'])
 @login_required
 def api_humanize_text():
@@ -1052,6 +1035,7 @@ def api_humanize_text():
     except Exception as e: 
         return jsonify({'error': str(e)}), 500
 
+# Article Wizard
 @app.route('/api/article-wizard', methods=['POST'])
 @login_required
 def api_article_wizard():
@@ -1066,6 +1050,7 @@ def api_article_wizard():
     except Exception as e: 
         return jsonify({'error': str(e)}), 500
 
+# YouTube to Blog
 @app.route('/api/youtube-to-blog', methods=['POST'])
 @login_required
 def api_youtube_to_blog():
@@ -1101,6 +1086,7 @@ def api_youtube_to_blog():
     except Exception as e: 
         return jsonify({'error': str(e)}), 500
 
+# Generate Content
 @app.route('/api/generate-content', methods=['POST'])
 @login_required
 def api_generate_content():
@@ -1112,6 +1098,7 @@ def api_generate_content():
     except Exception as e: 
         return jsonify({'error': str(e)}), 500
 
+# Save Content
 @app.route('/api/save-content', methods=['POST'])
 @login_required
 def api_save_content():
@@ -1139,6 +1126,7 @@ def api_save_content():
     db.session.commit()
     return jsonify({'success': True, 'id': new_c.id})
 
+# Publish to WordPress
 @app.route('/api/publish-wordpress', methods=['POST'])
 @login_required
 def api_publish_wordpress():
@@ -1152,6 +1140,7 @@ def api_publish_wordpress():
     except Exception as e: 
         return jsonify({'error': str(e)}), 500
 
+# Delete Content
 @app.route('/api/delete-content/<int:id>', methods=['POST'])
 @login_required
 def api_delete(id):
@@ -1161,26 +1150,28 @@ def api_delete(id):
         db.session.commit()
     return jsonify({'success': True})
 
-# --- HELPER APIs ---
+# Generate SEO Terms
 @app.route('/api/generate-seo-terms', methods=['POST'])
 @login_required
 def api_generate_seo_terms():
     res = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role":"system","content":"JSON"},{"role":"user","content":f"LSI keywords for {request.get_json().get('keyword')} as JSON array"}])
     return jsonify({'success':True, 'terms': json.loads(res.choices[0].message.content.replace('```json','').replace('```','').strip())})
 
+# Generate Questions
 @app.route('/api/generate-questions', methods=['POST'])
 @login_required
 def api_generate_questions():
     res = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role":"system","content":"JSON"},{"role":"user","content":f"PAA questions for {request.get_json().get('keyword')} as JSON array"}])
     return jsonify({'success':True, 'questions': json.loads(res.choices[0].message.content.replace('```json','').replace('```','').strip())})
 
+# Suggest Internal Links
 @app.route('/api/suggest-internal-links', methods=['POST'])
 @login_required
 def api_suggest_links():
     res = Content.query.filter(Content.user_id==current_user.id, Content.title.ilike(f"%{request.get_json().get('keyword')}%")).limit(5).all()
     return jsonify({'success':True, 'links': [{'id':c.id, 'title':c.title} for c in res]})
 
-# --- REAL READABILITY LOGIC ---
+# Readability Checker
 @app.route('/api/check-readability', methods=['POST'])
 @login_required
 def api_readability():
@@ -1268,6 +1259,7 @@ def api_readability():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Improve Readability
 @app.route('/api/improve-readability', methods=['POST'])
 @login_required
 def api_improve_readability():
@@ -1280,18 +1272,18 @@ def api_improve_readability():
             return jsonify({'error': 'No text provided'}), 400
 
         prompt = f"""
-        Rewrite the following text to improve its Flesch-Kincaid readability score.
-        Target: 7th-8th Grade Level (Score 60-70).
-        
-        Rules:
-        - Use shorter sentences.
-        - Use simpler vocabulary.
-        - Break up long paragraphs.
-        - Keep the original meaning.
-        
-        Text:
-        {text_content[:3000]}
-        """
+Rewrite the following text to improve its Flesch-Kincaid readability score.
+Target: 7th-8th Grade Level (Score 60-70).
+
+Rules:
+- Use shorter sentences.
+- Use simpler vocabulary.
+- Break up long paragraphs.
+- Keep the original meaning.
+
+Text:
+{text_content[:3000]}
+"""
         
         res = client.chat.completions.create(
             model="gpt-4o-mini", 
@@ -1306,7 +1298,7 @@ def api_improve_readability():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# --- UPDATED SCHEMA GENERATOR (3-in-1) ---
+# Schema Generator
 @app.route('/api/generate-schema', methods=['POST'])
 @login_required
 def api_schema():
@@ -1368,6 +1360,7 @@ def api_schema():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Competitor Analyzer
 @app.route('/api/analyze-competitor', methods=['POST'])
 @login_required
 def api_competitor():
@@ -1387,12 +1380,14 @@ def api_competitor():
     except: 
         return jsonify({'error': 'Failed to analyze URL'})
 
+# Keyword Clusters
 @app.route('/api/generate-clusters', methods=['POST'])
 @login_required
 def api_clusters():
     res = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role":"system","content":"JSON"},{"role":"user","content":f"Clusters for {request.get_json().get('keyword')} as JSON"}])
     return jsonify({'success':True, 'clusters': json.loads(res.choices[0].message.content.replace('```json','').replace('```','').strip())})
 
+# GBP Tool
 @app.route('/api/gbp-generate', methods=['POST'])
 @login_required
 def api_gbp_generate():
@@ -1407,6 +1402,7 @@ def api_gbp_generate():
     except Exception as e: 
         return jsonify({'error': str(e)}), 500
 
+# GEO Optimizer
 @app.route('/api/geo-optimize', methods=['POST'])
 @login_required
 def api_geo_optimize():
@@ -1421,30 +1417,7 @@ def api_geo_optimize():
     except Exception as e: 
         return jsonify({'error': str(e)}), 500
 
-@app.route('/test-email')
-def test_email():
-    try:
-        # Use the new Async function
-        send_email_background("Test Async", 'dilawarahsanrizvi7@gmail.com', "This email was sent in background.")
-        return "Email process started (Async)"
-    except Exception as e: 
-        return f"Err: {e}"
-
-@app.route('/fix-db')
-def fix_db():
-    try:
-        with db.engine.connect() as conn: 
-            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'free';"))
-            conn.commit()
-        return "DB Fixed"
-    except: 
-        return "Err"
-
-# ==========================================
-# NEW FEATURES APIs
-# ==========================================
-
-# 1. SOCIAL MEDIA PREVIEW API
+# Social Media Preview
 @app.route('/api/analyze-social', methods=['POST'])
 @login_required
 def api_analyze_social():
@@ -1478,7 +1451,7 @@ def api_analyze_social():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# 2. KEYWORD DENSITY API
+# Keyword Density
 @app.route('/api/analyze-density', methods=['POST'])
 @login_required
 def api_analyze_density():
@@ -1519,7 +1492,7 @@ def api_analyze_density():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# 3. PDF REPORT GENERATOR API
+# PDF Report Generator
 @app.route('/api/generate-report', methods=['POST'])
 @login_required
 def api_generate_report():
@@ -1573,7 +1546,7 @@ def api_generate_report():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# 4. YOUTUBE VIDEO SCRIPT API
+# YouTube Video Script
 @app.route('/api/generate-video-script', methods=['POST'])
 @login_required
 def api_generate_video_script():
@@ -1585,18 +1558,18 @@ def api_generate_video_script():
     tone = data.get('tone', 'Engaging')
     
     prompt = f"""
-    Create a structured YouTube Video Script.
-    Topic: {topic}
-    Tone: {tone}
-    
-    Structure:
-    1. Hook (0-30s): Catchy opening.
-    2. Intro: What will be covered.
-    3. Body: 3 main points.
-    4. CTA: Call to action.
-    
-    Format using Markdown headings.
-    """
+Create a structured YouTube Video Script.
+Topic: {topic}
+Tone: {tone}
+
+Structure:
+1. Hook (0-30s): Catchy opening.
+2. Intro: What will be covered.
+3. Body: 3 main points.
+4. CTA: Call to action.
+
+Format using Markdown headings.
+"""
     
     try:
         res = client.chat.completions.create(
@@ -1615,7 +1588,7 @@ def api_generate_video_script():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# 5. SOCIAL MEDIA POST GENERATOR API
+# Social Media Posts
 @app.route('/api/generate-social-posts', methods=['POST'])
 @login_required
 def api_generate_social_posts():
@@ -1626,14 +1599,14 @@ def api_generate_social_posts():
     topic = data.get('topic')
     
     prompt = f"""
-    Write 3 distinct social media posts about: "{topic}".
-    
-    1. LinkedIn Post: Professional, use bullet points, end with a thought-provoking question.
-    2. Twitter Thread (3 tweets): Short, punchy, informative.
-    3. Instagram Caption: Casual, engaging, include 5 relevant hashtags.
-    
-    Format the output clearly with headers (e.g., ### LinkedIn).
-    """
+Write 3 distinct social media posts about: "{topic}".
+
+1. LinkedIn Post: Professional, use bullet points, end with a question.
+2. Twitter Thread (3 tweets): Short, punchy, informative.
+3. Instagram Caption: Casual, engaging, include 5 relevant hashtags.
+
+Format the output clearly with headers (e.g., ### LinkedIn).
+"""
     
     try:
         res = client.chat.completions.create(
@@ -1652,7 +1625,7 @@ def api_generate_social_posts():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# 6. COMPETITOR SPY API
+# Competitor Spy
 @app.route('/api/spy-competitor', methods=['POST'])
 @login_required
 def api_spy_competitor():
@@ -1681,16 +1654,16 @@ def api_spy_competitor():
         common_words = [w[0] for w in Counter(filtered_words).most_common(8)]
         
         prompt = f"""
-        Analyze this competitor's content strategy:
-        URL: {url}
-        Title: {title}
-        H1: {h1s}
-        Top Keywords: {common_words}
-        Word Count: {word_count}
-        
-        Provide 3 specific insights on why they might be ranking well, and 3 specific ways I can outrank them.
-        Keep it actionable and punchy.
-        """
+Analyze this competitor's content strategy:
+URL: {url}
+Title: {title}
+H1: {h1s}
+Top Keywords: {common_words}
+Word Count: {word_count}
+
+Provide 3 specific insights on why they might be ranking well, and 3 specific ways I can outrank them.
+Keep it actionable and punchy.
+"""
         
         res = client.chat.completions.create(
             model="gpt-4o-mini", 
@@ -1715,7 +1688,7 @@ def api_spy_competitor():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# 7. AI KEYWORD RESEARCH & CLUSTER API
+# AI Keyword Research
 @app.route('/api/research-keywords', methods=['POST'])
 @login_required
 def api_research_keywords():
@@ -1726,18 +1699,18 @@ def api_research_keywords():
     seed = data.get('seed')
     
     prompt = f"""
-    Act as a master SEO strategist.
-    Seed Keyword: "{seed}"
-    
-    Generate a JSON list of 15 highly relevant Long-Tail Keywords.
-    For each keyword, provide:
-    1. "keyword": The keyword string.
-    2. "intent": (Informational, Commercial, or Transactional).
-    3. "difficulty": A score from 1-100 (Estimated).
-    4. "content_idea": A catchy blog post title for this keyword.
-    
-    Return ONLY valid JSON array format. No markdown.
-    """
+Act as a master SEO strategist.
+Seed Keyword: "{seed}"
+
+Generate a JSON list of 15 highly relevant Long-Tail Keywords.
+For each keyword, provide:
+1. "keyword": The keyword string.
+2. "intent": (Informational, Commercial, or Transactional).
+3. "difficulty": A score from 1-100 (Estimated).
+4. "content_idea": A catchy blog post title for this keyword.
+
+Return ONLY valid JSON array format. No markdown.
+"""
     
     try:
         res = client.chat.completions.create(
@@ -1757,7 +1730,7 @@ def api_research_keywords():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# 8. SMART CONTENT OUTLINE API
+# Smart Content Outline
 @app.route('/api/generate-outline', methods=['POST'])
 @login_required
 def api_generate_outline():
@@ -1768,17 +1741,17 @@ def api_generate_outline():
     topic = data.get('topic')
     
     prompt = f"""
-    Create a comprehensive, SEO-optimized blog post outline for the topic: "{topic}".
-    
-    Structure:
-    1. Catchy H1 Title.
-    2. Introduction (Hook).
-    3. 4-5 H2 Sections (Logical flow).
-    4. Under each H2, list 3 bullet points of what to cover.
-    5. Conclusion & Key Takeaways.
-    
-    Format using Markdown.
-    """
+Create a comprehensive, SEO-optimized blog post outline for the topic: "{topic}".
+
+Structure:
+1. Catchy H1 Title.
+2. Introduction (Hook).
+3. 4-5 H2 Sections (Logical flow).
+4. Under each H2, list 3 bullet points of what to cover.
+5. Conclusion & Key Takeaways.
+
+Format using Markdown.
+"""
     
     try:
         res = client.chat.completions.create(
@@ -1797,10 +1770,53 @@ def api_generate_outline():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Test Email Route
+@app.route('/test-email')
+def test_email():
+    try:
+        send_email_background("Test Async", 'dilawarahsanrizvi7@gmail.com', "This email was sent in background.")
+        return "Email process started (Async)"
+    except Exception as e: 
+        return f"Err: {e}"
+
+# Database Fix Route
+@app.route('/fix-db')
+def fix_db():
+    try:
+        with db.engine.connect() as conn: 
+            conn.execute(text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'free';"))
+            conn.commit()
+        return "DB Fixed"
+    except: 
+        return "Err"
+
 # ==========================================
-# RUN APPLICATION
+# RAILWAY PRODUCTION START (CRITICAL)
 # ==========================================
-if __name__ == '__main__':
-    with app.app_context(): 
-        db.create_all()
-    app.run(debug=True, port=int(os.environ.get('PORT', 5001)))
+
+@app.before_first_request
+def create_tables():
+    """Auto-create database tables on first request"""
+    db.create_all()
+    print("✅ Database tables created/verified")
+    
+    # Create default admin user (only if no users exist)
+    if not User.query.filter_by(email='admin@myseokingtool.com').first():
+        try:
+            hashed = bcrypt.generate_password_hash('AdminPassword123!').decode('utf-8')
+            admin = User(
+                username='admin',
+                email='admin@myseokingtool.com',
+                password_hash=hashed,
+                is_admin=True,
+                tier='enterprise'
+            )
+            db.session.add(admin)
+            db.session.commit()
+            print("✅ Default admin user created: admin@myseokingtool.com / AdminPassword123!")
+        except Exception as e:
+            print(f"⚠️ Admin user creation skipped: {e}")
+
+if __name__ == "__main__":
+    # For local testing only
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
