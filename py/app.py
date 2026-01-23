@@ -1693,43 +1693,76 @@ Keep it actionable and punchy.
 @login_required
 def api_research_keywords():
     if current_user.ai_requests_this_month >= current_user.get_limits()['ai_requests_per_month']:
-        return jsonify({'error': 'Limit reached'}), 403
-    
-    data = request.get_json()
-    seed = data.get('seed')
-    
-    prompt = f"""
-Act as a master SEO strategist.
-Seed Keyword: "{seed}"
-
-Generate a JSON list of 15 highly relevant Long-Tail Keywords.
-For each keyword, provide:
-1. "keyword": The keyword string.
-2. "intent": (Informational, Commercial, or Transactional).
-3. "difficulty": A score from 1-100 (Estimated).
-4. "content_idea": A catchy blog post title for this keyword.
-
-Return ONLY valid JSON array format. No markdown.
-"""
+        return jsonify({'error': 'Monthly limit reached. Please upgrade your plan.'}), 403
     
     try:
+        data = request.get_json()
+        seed = data.get('seed', '').strip()
+        
+        if not seed:
+            return jsonify({'error': 'Please provide a seed keyword'}), 400
+        
+        prompt = f"""You are an expert SEO keyword researcher.
+
+Seed Keyword: "{seed}"
+
+Generate 15 highly relevant long-tail keywords based on this seed.
+
+Return your response as a valid JSON array with this exact structure:
+[
+  {{
+    "keyword": "example long tail keyword",
+    "intent": "Informational",
+    "difficulty": 45,
+    "content_idea": "Catchy Blog Post Title Here"
+  }}
+]
+
+Important:
+- Use ONLY these intent values: "Informational", "Commercial", "Transactional"
+- Difficulty must be a number between 1-100
+- Return ONLY the JSON array, no explanations, no markdown code blocks
+"""
+        
         res = client.chat.completions.create(
-            model="gpt-4o-mini", 
-            messages=[{"role":"system","content":"JSON Generator"},{"role":"user","content":prompt}]
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a JSON-only API. Return valid JSON arrays without any markdown formatting."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
         )
         
+        raw_content = res.choices[0].message.content.strip()
+        
+        # Clean up markdown code blocks if present
+        raw_content = raw_content.replace('```json', '').replace('```', '').strip()
+        
+        # Parse JSON
+        try:
+            keywords_data = json.loads(raw_content)
+        except json.JSONDecodeError as je:
+            print(f"❌ JSON Parse Error: {je}")
+            print(f"Raw OpenAI Response: {raw_content}")
+            return jsonify({'error': 'Failed to parse AI response. Please try again.'}), 500
+        
+        # Validate it's a list
+        if not isinstance(keywords_data, list):
+            return jsonify({'error': 'Invalid response format from AI'}), 500
+        
+        # Update user's AI request count
         current_user.ai_requests_this_month += 1
         db.session.commit()
         
-        raw = res.choices[0].message.content.replace('```json','').replace('```','').strip()
-        
         return jsonify({
             'success': True, 
-            'keywords': json.loads(raw)
+            'keywords': keywords_data
         })
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
+        print(f"❌ Keyword Research Error: {str(e)}")
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 # Smart Content Outline
 @app.route('/api/generate-outline', methods=['POST'])
 @login_required
