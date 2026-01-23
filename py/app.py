@@ -391,6 +391,56 @@ def sitemap_generator_page():
 def robots_generator_page():
     return render_template('robots_generator.html')
 
+# ==========================================
+# PASSWORD CHANGE ROUTE
+# ==========================================
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        try:
+            data = request.get_json() if request.is_json else request.form
+            current_password = data.get('current_password')
+            new_password = data.get('new_password')
+            confirm_password = data.get('confirm_password')
+            
+            if not current_password or not new_password or not confirm_password:
+                return jsonify({'error': 'All fields are required'}), 400
+            
+            if not current_user.check_password(current_password):
+                return jsonify({'error': 'Current password is incorrect'}), 401
+            
+            if new_password != confirm_password:
+                return jsonify({'error': 'New passwords do not match'}), 400
+            
+            if len(new_password) < 8:
+                return jsonify({'error': 'Password must be at least 8 characters'}), 400
+            
+            current_user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Password changed successfully!'})
+            
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    return render_template('change_password.html')
+
+# ==========================================
+# TECHNICAL SEO ROUTES
+# ==========================================
+@app.route('/robots.txt')
+def robots_txt():
+    lines = [
+        "User-agent: *", 
+        "Disallow: /dashboard", 
+        "Disallow: /editor", 
+        "Disallow: /admin", 
+        "Disallow: /profile", 
+        f"Sitemap: {request.url_root}sitemap.xml"
+    ]
+    return "\n".join(lines), 200, {'Content-Type': 'text/plain'}
+
 @app.route('/robots.txt')
 def robots_txt():
     lines = [
