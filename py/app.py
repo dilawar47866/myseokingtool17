@@ -1791,18 +1791,19 @@ def fix_db():
         return "Err"
 
  ==========================================
+# ==========================================
 # RAILWAY PRODUCTION START (FLASK 3.0 COMPATIBLE)
 # ==========================================
 
 def init_db():
     """Initialize database tables and create default admin"""
     with app.app_context():
-        db.create_all()
-        print("✅ Database tables created/verified")
-        
-        # Create default admin user (only if no users exist)
-        if not User.query.filter_by(email='admin@myseokingtool.com').first():
-            try:
+        try:
+            db.create_all()
+            print("✅ Database tables created/verified")
+            
+            # Create default admin user (only if no users exist)
+            if not User.query.filter_by(email='admin@myseokingtool.com').first():
                 hashed = bcrypt.generate_password_hash('AdminPassword123!').decode('utf-8')
                 admin = User(
                     username='admin',
@@ -1814,12 +1815,11 @@ def init_db():
                 db.session.add(admin)
                 db.session.commit()
                 print("✅ Default admin user created: admin@myseokingtool.com / AdminPassword123!")
-            except Exception as e:
-                print(f"⚠️ Admin user creation skipped: {e}")
+        except Exception as e:
+            print(f"⚠️ Database initialization error: {e}")
 
 # Initialize database when app starts
 init_db()
 
 if __name__ == "__main__":
-    # For local testing only
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
