@@ -1,635 +1,269 @@
-{% extends "base.html" %}
-
-{% block title %}Dashboard - My SEO King Tool{% endblock %}
-
-{% block meta_title %}Dashboard - My SEO King Tool | Your SEO Command Center{% endblock %}
-{% block meta_description %}Access all 30+ AI-powered SEO tools from your dashboard. Generate content, research keywords, and optimize your website.{% endblock %}
-
-{% block content %}
-<div class="container-fluid py-4">
-    <div class="row">
-        <!-- Sidebar -->
-        <div class="col-lg-3 col-xl-2 d-none d-lg-block">
-            <div class="card border-0 shadow-sm sticky-top" style="top: 80px;">
-                <div class="card-body p-3">
-                    <div class="text-center mb-4">
-                        <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 60px; height: 60px;">
-                            <span class="fw-bold fs-4">{{ current_user.username[0]|upper }}</span>
-                        </div>
-                        <h6 class="mb-1">{{ current_user.username }}</h6>
-                        <span class="badge bg-{{ 'warning' if current_user.tier != 'free' else 'secondary' }}">
-                            {{ current_user.tier|title }}
-                        </span>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <small class="text-muted">AI Requests</small>
-                            <small class="fw-bold">{{ current_user.ai_requests_this_month }}/{{ limits.ai_requests_per_month }}</small>
-                        </div>
-                        <div class="progress" style="height: 8px;">
-                            <div class="progress-bar bg-primary" style="width: {{ (current_user.ai_requests_this_month / limits.ai_requests_per_month * 100)|int }}%"></div>
-                        </div>
-                    </div>
-                    
-                    <nav class="nav flex-column">
-                        <a class="nav-link active" href="/dashboard"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
-                        <a class="nav-link" href="/editor"><i class="bi bi-pencil-square me-2"></i>Content Editor</a>
-                        <a class="nav-link" href="/content-library"><i class="bi bi-folder me-2"></i>My Content</a>
-                        <a class="nav-link" href="/profile"><i class="bi bi-person me-2"></i>Profile</a>
-                        {% if current_user.tier == 'free' %}
-                        <hr>
-                        <a class="nav-link text-warning" href="/pricing"><i class="bi bi-crown me-2"></i>Upgrade to Pro</a>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - My SEO King Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50">
+    
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-indigo-600">
+                        <i class="fas fa-crown mr-2"></i>My SEO King Tool
+                    </a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="hidden md:flex items-center space-x-6">
+                        <a href="/dashboard" class="text-gray-700 hover:text-indigo-600 font-medium">Dashboard</a>
+                        <a href="/content-library" class="text-gray-700 hover:text-indigo-600">Content</a>
+                        <a href="/pricing" class="text-gray-700 hover:text-indigo-600">Pricing</a>
+                        {% if current_user.is_admin %}
+                        <a href="/admin" class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-semibold">
+                            <i class="fas fa-shield-alt mr-1"></i>Admin
+                        </a>
                         {% endif %}
-                    </nav>
+                    </div>
+                    
+                    <!-- User Menu -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" class="flex items-center space-x-2 bg-indigo-100 px-4 py-2 rounded-lg hover:bg-indigo-200 transition">
+                            <div class="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
+                                {{ current_user.username[0].upper() }}
+                            </div>
+                            <span class="font-medium text-gray-700">{{ current_user.username }}</span>
+                            <i class="fas fa-chevron-down text-sm"></i>
+                        </button>
+                        
+                        <div x-show="open" @click.away="open = false" 
+                             class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-2 border"
+                             style="display: none;">
+                            <div class="px-4 py-3 border-b">
+                                <p class="text-sm text-gray-500">Signed in as</p>
+                                <p class="text-sm font-medium text-gray-900">{{ current_user.email }}</p>
+                                <p class="text-xs text-indigo-600 font-semibold uppercase mt-1">{{ current_user.tier }} Plan</p>
+                            </div>
+                            <a href="/profile" class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                <i class="fas fa-user mr-3"></i>Profile
+                            </a>
+                            <a href="/change-password" class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                <i class="fas fa-key mr-3"></i>Change Password
+                            </a>
+                            <a href="/content-library" class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100">
+                                <i class="fas fa-folder mr-3"></i>My Content
+                            </a>
+                            <div class="border-t mt-2 pt-2">
+                                <a href="/logout" class="flex items-center px-4 py-2 text-red-600 hover:bg-red-50">
+                                    <i class="fas fa-sign-out-alt mr-3"></i>Logout
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        <!-- Main Content -->
-        <div class="col-lg-9 col-xl-10">
-            <!-- Welcome Header -->
-            <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <!-- Welcome Banner -->
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white mb-8">
+            <div class="flex items-center justify-between">
                 <div>
-                    <h2 class="fw-bold mb-1">Welcome back, {{ current_user.username }}! 👋</h2>
-                    <p class="text-muted mb-0">What would you like to create today?</p>
+                    <h1 class="text-3xl font-bold mb-2">Welcome back, {{ current_user.username }}! 👋</h1>
+                    <p class="text-indigo-100">You're on the <strong>{{ current_user.tier.upper() }}</strong> plan</p>
                 </div>
-                <a href="/article-wizard" class="btn btn-primary">
-                    <i class="bi bi-plus-lg me-2"></i>Create New Article
+                {% if current_user.tier == 'free' %}
+                <a href="/pricing" class="bg-white text-indigo-600 px-6 py-3 rounded-lg font-semibold hover:bg-indigo-50 transition">
+                    <i class="fas fa-crown mr-2"></i>Upgrade to Pro
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-indigo-600">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-medium">Total Content</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_content }}</p>
+                    </div>
+                    <div class="bg-indigo-100 rounded-full p-3">
+                        <i class="fas fa-file-alt text-indigo-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-600">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-medium">Total Words</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ "{:,}".format(total_words) }}</p>
+                    </div>
+                    <div class="bg-green-100 rounded-full p-3">
+                        <i class="fas fa-font text-green-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-yellow-600">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-medium">Avg SEO Score</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ avg_score }}/100</p>
+                    </div>
+                    <div class="bg-yellow-100 rounded-full p-3">
+                        <i class="fas fa-chart-line text-yellow-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-600">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-medium">AI Requests</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">
+                            {{ current_user.ai_requests_this_month }}/{{ limits['ai_requests_per_month'] }}
+                        </p>
+                    </div>
+                    <div class="bg-purple-100 rounded-full p-3">
+                        <i class="fas fa-robot text-purple-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">
+                <i class="fas fa-bolt text-yellow-500 mr-2"></i>Quick Actions
+            </h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <a href="/keyword-research" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-600 hover:bg-indigo-50 transition">
+                    <i class="fas fa-search text-indigo-600 text-2xl mb-2"></i>
+                    <span class="text-sm font-medium text-gray-700">Keyword Research</span>
+                </a>
+                <a href="/article-wizard" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-600 hover:bg-indigo-50 transition">
+                    <i class="fas fa-magic text-purple-600 text-2xl mb-2"></i>
+                    <span class="text-sm font-medium text-gray-700">Article Wizard</span>
+                </a>
+                <a href="/sitemap-generator" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-600 hover:bg-indigo-50 transition">
+                    <i class="fas fa-sitemap text-green-600 text-2xl mb-2"></i>
+                    <span class="text-sm font-medium text-gray-700">Sitemap Generator</span>
+                </a>
+                <a href="/site-auditor" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-600 hover:bg-indigo-50 transition">
+                    <i class="fas fa-stethoscope text-red-600 text-2xl mb-2"></i>
+                    <span class="text-sm font-medium text-gray-700">Site Auditor</span>
                 </a>
             </div>
-            
-            <!-- Stats Cards -->
-            <div class="row g-3 mb-4">
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-body text-center">
-                            <div class="text-primary mb-2">
-                                <i class="bi bi-file-earmark-text fs-3"></i>
-                            </div>
-                            <h3 class="fw-bold mb-0">{{ total_content }}</h3>
-                            <small class="text-muted">Total Articles</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-body text-center">
-                            <div class="text-success mb-2">
-                                <i class="bi bi-body-text fs-3"></i>
-                            </div>
-                            <h3 class="fw-bold mb-0">{{ "{:,}".format(total_words) }}</h3>
-                            <small class="text-muted">Words Written</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-body text-center">
-                            <div class="text-warning mb-2">
-                                <i class="bi bi-lightning-charge fs-3"></i>
-                            </div>
-                            <h3 class="fw-bold mb-0">{{ current_user.ai_requests_this_month }}</h3>
-                            <small class="text-muted">AI Requests Used</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-body text-center">
-                            <div class="text-info mb-2">
-                                <i class="bi bi-graph-up fs-3"></i>
-                            </div>
-                            <h3 class="fw-bold mb-0">{{ avg_score }}</h3>
-                            <small class="text-muted">Avg SEO Score</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Quick Actions -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-body">
-                    <h5 class="fw-bold mb-3"><i class="bi bi-lightning-charge text-warning me-2"></i>Quick Actions</h5>
-                    <div class="row g-2">
-                        <div class="col-6 col-md-3">
-                            <a href="/article-wizard" class="btn btn-outline-primary w-100 py-3">
-                                <i class="bi bi-magic d-block fs-4 mb-1"></i>
-                                <small>Article Wizard</small>
-                            </a>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <a href="/keyword-research" class="btn btn-outline-primary w-100 py-3">
-                                <i class="bi bi-key d-block fs-4 mb-1"></i>
-                                <small>Keyword Research</small>
-                            </a>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <a href="/site-auditor" class="btn btn-outline-primary w-100 py-3">
-                                <i class="bi bi-search d-block fs-4 mb-1"></i>
-                                <small>Site Auditor</small>
-                            </a>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <a href="/content-humanizer" class="btn btn-outline-primary w-100 py-3">
-                                <i class="bi bi-person-heart d-block fs-4 mb-1"></i>
-                                <small>Humanizer</small>
-                            </a>
-                        </div>
-                    </div>
-                </div>
+        </div>
+
+        <!-- Recent Content -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold text-gray-900">
+                    <i class="fas fa-history text-indigo-600 mr-2"></i>Recent Content
+                </h2>
+                <a href="/content-library" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                    View All →
+                </a>
             </div>
 
-            <!-- ALL TOOLS SECTION -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-grid-3x3-gap text-primary me-2"></i>All SEO Tools (30+)</h5>
-                </div>
-                <div class="card-body">
-                    
-                    <!-- Content Creation Tools -->
-                    <h6 class="text-muted fw-bold mb-3 mt-2">
-                        <i class="bi bi-pencil-square me-2"></i>CONTENT CREATION
-                    </h6>
-                    <div class="row g-3 mb-4">
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/article-wizard" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-magic fs-5 text-primary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Article Wizard</h6>
-                                    <small class="text-muted">AI blog posts</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/bulk-writer" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-stack fs-5 text-warning"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Bulk Writer <span class="badge bg-warning text-dark" style="font-size: 0.6rem;">PRO</span></h6>
-                                    <small class="text-muted">10 articles at once</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/youtube-to-blog" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-youtube fs-5 text-danger"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">YouTube to Blog</h6>
-                                    <small class="text-muted">Video to article</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/content-humanizer" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-person-heart fs-5 text-success"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Content Humanizer</h6>
-                                    <small class="text-muted">Beat AI detectors</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/content-outline" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-list-nested fs-5 text-info"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Content Outline</h6>
-                                    <small class="text-muted">Structure generator</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/content-brief" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-secondary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-file-text fs-5 text-secondary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Content Brief</h6>
-                                    <small class="text-muted">Writing guidelines</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/youtube-script" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-camera-video fs-5 text-danger"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">YouTube Script</h6>
-                                    <small class="text-muted">Video scripts</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/social-posts" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-share fs-5 text-primary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Social Posts</h6>
-                                    <small class="text-muted">Multi-platform</small>
-                                </div>
-                            </a>
+            {% if recent_content %}
+            <div class="space-y-4">
+                {% for content in recent_content %}
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-gray-900">{{ content.title }}</h3>
+                        <div class="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                            <span><i class="fas fa-font mr-1"></i>{{ content.word_count }} words</span>
+                            <span><i class="fas fa-chart-line mr-1"></i>SEO: {{ content.seo_score }}/100</span>
+                            <span><i class="fas fa-calendar mr-1"></i>{{ content.updated_at.strftime('%b %d, %Y') }}</span>
                         </div>
                     </div>
-                    
-                    <!-- Keyword & Research Tools -->
-                    <h6 class="text-muted fw-bold mb-3">
-                        <i class="bi bi-key me-2"></i>KEYWORD & RESEARCH
-                    </h6>
-                    <div class="row g-3 mb-4">
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/keyword-research" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-key fs-5 text-primary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Keyword Research</h6>
-                                    <small class="text-muted">Find keywords</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/lsi-keywords" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-diagram-2 fs-5 text-success"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">LSI Keywords</h6>
-                                    <small class="text-muted">Related terms</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/keyword-density" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-percent fs-5 text-warning"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Keyword Density</h6>
-                                    <small class="text-muted">Analyze density</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/competitor-analyzer" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-binoculars fs-5 text-danger"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Competitor Spy</h6>
-                                    <small class="text-muted">Analyze rivals</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/serp-analysis" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-bar-chart fs-5 text-info"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">SERP Analysis</h6>
-                                    <small class="text-muted">Search results</small>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Technical SEO Tools -->
-                    <h6 class="text-muted fw-bold mb-3">
-                        <i class="bi bi-gear me-2"></i>TECHNICAL SEO
-                    </h6>
-                    <div class="row g-3 mb-4">
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/site-auditor" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-search fs-5 text-primary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Site Auditor</h6>
-                                    <small class="text-muted">SEO analysis</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/sitemap-generator" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-diagram-3 fs-5 text-success"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Sitemap Generator</h6>
-                                    <small class="text-muted">XML sitemaps</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/robots-generator" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-robot fs-5 text-warning"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Robots.txt</h6>
-                                    <small class="text-muted">Crawler control</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/schema-generator" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-code-slash fs-5 text-info"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Schema Generator</h6>
-                                    <small class="text-muted">Structured data</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/meta-tags" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-secondary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-tags fs-5 text-secondary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Meta Tags</h6>
-                                    <small class="text-muted">Title & description</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/social-preview" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-eye fs-5 text-primary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Social Preview</h6>
-                                    <small class="text-muted">OG tag checker</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/internal-linking" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-link-45deg fs-5 text-success"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Internal Linking</h6>
-                                    <small class="text-muted">Link suggestions</small>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Content Optimization -->
-                    <h6 class="text-muted fw-bold mb-3">
-                        <i class="bi bi-sliders me-2"></i>CONTENT OPTIMIZATION
-                    </h6>
-                    <div class="row g-3 mb-4">
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/readability-checker" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-book fs-5 text-primary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Readability</h6>
-                                    <small class="text-muted">Score checker</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/headline-analyzer" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-type-h1 fs-5 text-warning"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Headline Analyzer</h6>
-                                    <small class="text-muted">Title scorer</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/plagiarism-checker" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-shield-check fs-5 text-danger"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Plagiarism Check</h6>
-                                    <small class="text-muted">Originality</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/faq-schema" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-question-circle fs-5 text-info"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">FAQ Schema</h6>
-                                    <small class="text-muted">Rich snippets</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/email-subject" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-envelope fs-5 text-success"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Email Subject</h6>
-                                    <small class="text-muted">Subject lines</small>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Image & Media Tools -->
-                    <h6 class="text-muted fw-bold mb-3">
-                        <i class="bi bi-image me-2"></i>IMAGE & MEDIA
-                    </h6>
-                    <div class="row g-3 mb-4">
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/image-generator" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-stars fs-5 text-primary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">AI Image Gen <span class="badge bg-warning text-dark" style="font-size: 0.6rem;">PRO</span></h6>
-                                    <small class="text-muted">DALL-E 3</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/alt-text-generator" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-card-text fs-5 text-success"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Alt Text Gen</h6>
-                                    <small class="text-muted">Image alt tags</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/image-seo" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-file-image fs-5 text-warning"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Image SEO</h6>
-                                    <small class="text-muted">Optimize images</small>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Local SEO Tools -->
-                    <h6 class="text-muted fw-bold mb-3">
-                        <i class="bi bi-geo-alt me-2"></i>LOCAL SEO
-                    </h6>
-                    <div class="row g-3 mb-4">
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/gbp-tool" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-building fs-5 text-primary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">GBP Tool</h6>
-                                    <small class="text-muted">Google Business</small>
-                                </div>
-                            </a>
-                        </div>
-                        
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/geo-optimizer" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-globe-americas fs-5 text-success"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">GEO Optimizer</h6>
-                                    <small class="text-muted">Location SEO</small>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Link Building -->
-                    <h6 class="text-muted fw-bold mb-3">
-                        <i class="bi bi-link me-2"></i>LINK BUILDING
-                    </h6>
-                    <div class="row g-3">
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <a href="/backlink-outreach" class="card border h-100 text-decoration-none hover-shadow">
-                                <div class="card-body text-center p-3">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
-                                        <i class="bi bi-envelope-paper fs-5 text-primary"></i>
-                                    </div>
-                                    <h6 class="mb-1 text-dark">Backlink Outreach</h6>
-                                    <small class="text-muted">Email templates</small>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                    
-                </div>
-            </div>
-            
-            <!-- Recent Content -->
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Recent Content</h5>
-                    <a href="/content-library" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
-                <div class="card-body">
-                    {% if recent_content %}
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Title</th>
-                                    <th>Keyword</th>
-                                    <th>Words</th>
-                                    <th>Updated</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for content in recent_content %}
-                                <tr>
-                                    <td>
-                                        <a href="/editor?id={{ content.id }}" class="text-decoration-none fw-semibold">
-                                            {{ content.title[:40] }}{% if content.title|length > 40 %}...{% endif %}
-                                        </a>
-                                    </td>
-                                    <td><span class="badge bg-light text-dark">{{ content.keyword or 'N/A' }}</span></td>
-                                    <td>{{ content.word_count }}</td>
-                                    <td><small class="text-muted">{{ content.updated_at.strftime('%b %d, %Y') }}</small></td>
-                                    <td>
-                                        <a href="/editor?id={{ content.id }}" class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="text-center py-5">
-                        <i class="bi bi-file-earmark-plus fs-1 text-muted mb-3"></i>
-                        <h5 class="text-muted">No content yet</h5>
-                        <p class="text-muted mb-3">Create your first article to get started!</p>
-                        <a href="/article-wizard" class="btn btn-primary">
-                            <i class="bi bi-magic me-2"></i>Create First Article
+                    <div class="flex items-center space-x-2">
+                        <a href="/editor?id={{ content.id }}" class="bg-indigo-100 text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-200 transition">
+                            <i class="fas fa-edit"></i>
                         </a>
                     </div>
-                    {% endif %}
                 </div>
+                {% endfor %}
             </div>
-            
+            {% else %}
+            <div class="text-center py-12">
+                <i class="fas fa-file-alt text-gray-300 text-6xl mb-4"></i>
+                <p class="text-gray-500 text-lg">No content created yet</p>
+                <a href="/article-wizard" class="inline-block mt-4 bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition">
+                    <i class="fas fa-plus mr-2"></i>Create Your First Content
+                </a>
+            </div>
+            {% endif %}
         </div>
+
+        <!-- All SEO Tools Section -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mt-8">
+            <h2 class="text-xl font-bold text-gray-900 mb-6">
+                <i class="fas fa-toolbox text-indigo-600 mr-2"></i>All SEO Tools
+            </h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <a href="/keyword-research" class="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-600 hover:shadow-md transition">
+                    <i class="fas fa-search text-indigo-600 text-xl mb-2"></i>
+                    <span class="text-xs text-center font-medium">Keyword Research</span>
+                </a>
+                <a href="/article-wizard" class="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-600 hover:shadow-md transition">
+                    <i class="fas fa-magic text-purple-600 text-xl mb-2"></i>
+                    <span class="text-xs text-center font-medium">Article Wizard</span>
+                </a>
+                <a href="/bulk-writer" class="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-600 hover:shadow-md transition">
+                    <i class="fas fa-layer-group text-blue-600 text-xl mb-2"></i>
+                    <span class="text-xs text-center font-medium">Bulk Writer</span>
+                    {% if current_user.tier == 'free' %}
+                    <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded mt-1">PRO</span>
+                    {% endif %}
+                </a>
+                <a href="/sitemap-generator" class="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-600 hover:shadow-md transition">
+                    <i class="fas fa-sitemap text-green-600 text-xl mb-2"></i>
+                    <span class="text-xs text-center font-medium">Sitemap Generator</span>
+                </a>
+                <a href="/robots-generator" class="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-600 hover:shadow-md transition">
+                    <i class="fas fa-robot text-gray-600 text-xl mb-2"></i>
+                    <span class="text-xs text-center font-medium">Robots.txt</span>
+                </a>
+                <a href="/site-auditor" class="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-600 hover:shadow-md transition">
+                    <i class="fas fa-stethoscope text-red-600 text-xl mb-2"></i>
+                    <span class="text-xs text-center font-medium">Site Auditor</span>
+                </a>
+                <a href="/youtube-to-blog" class="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-600 hover:shadow-md transition">
+                    <i class="fab fa-youtube text-red-600 text-xl mb-2"></i>
+                    <span class="text-xs text-center font-medium">YouTube to Blog</span>
+                </a>
+                <a href="/content-humanizer" class="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-600 hover:shadow-md transition">
+                    <i class="fas fa-user-edit text-teal-600 text-xl mb-2"></i>
+                    <span class="text-xs text-center font-medium">Content Humanizer</span>
+                </a>
+                <a href="/image-generator" class="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-600 hover:shadow-md transition">
+                    <i class="fas fa-image text-pink-600 text-xl mb-2"></i>
+                    <span class="text-xs text-center font-medium">Image Generator</span>
+                    {% if current_user.tier == 'free' %}
+                    <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded mt-1">PRO</span>
+                    {% endif %}
+                </a>
+                <a href="/schema-generator" class="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-600 hover:shadow-md transition">
+                    <i class="fas fa-code text-orange-600 text-xl mb-2"></i>
+                    <span class="text-xs text-center font-medium">Schema Generator</span>
+                </a>
+            </div>
+        </div>
+
     </div>
-</div>
 
-<style>
-.hover-shadow:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-    transition: all 0.2s ease;
-}
-
-.card {
-    transition: all 0.2s ease;
-}
-</style>
-{% endblock %}
+    <!-- Alpine.js for dropdown -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</body>
+</html>
