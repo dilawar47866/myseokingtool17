@@ -1,104 +1,71 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - My SEO King Tool</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body class="bg-gray-50">
-    
-    <nav class="bg-white shadow-sm border-b">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <a href="/dashboard" class="text-2xl font-bold text-indigo-600">
-                        <i class="fas fa-crown mr-2"></i>My SEO King Tool
-                    </a>
+{% extends "base.html" %}
+{% block title %}AI Image Generator - MySEO King{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="h3 fw-bold mb-1">AI Image Generator (DALL-E 3)</h2>
+                    <p class="text-muted">Create unique visuals for your content.</p>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/dashboard" class="text-gray-700 hover:text-indigo-600">Dashboard</a>
-                    <a href="/content-library" class="text-gray-700 hover:text-indigo-600">Content</a>
-                    <a href="/pricing" class="text-gray-700 hover:text-indigo-600">Pricing</a>
-                    <a href="/change-password" class="text-gray-700 hover:text-indigo-600">
-                        <i class="fas fa-key mr-1"></i>Password
-                    </a>
-                    <a href="/logout" class="bg-red-600 text-white px-4 py-2 rounded-lg">Logout</a>
-                </div>
+                <span class="badge bg-warning text-dark">Pro Only</span>
             </div>
-        </div>
-    </nav>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white mb-8">
-            <h1 class="text-3xl font-bold">Welcome back! 👋</h1>
-        </div>
+            <div class="card shadow-sm p-4 mb-4">
+                <!-- Prompt Input -->
+                <label class="form-label fw-bold">Describe your image</label>
+                <textarea id="imgPrompt" class="form-control mb-3" rows="2" placeholder="A futuristic workspace with glowing neon lights..."></textarea>
+                
+                <!-- Template/Size Dropdown (NEW) -->
+                <label class="form-label fw-bold">Template / Size</label>
+                <select id="imgSize" class="form-select mb-4">
+                    <option value="1024x1024">Square (Instagram Post) - 1:1</option>
+                    <option value="1024x1792">Portrait (Stories / TikTok) - 9:16</option>
+                    <option value="1792x1024">Landscape (YouTube / Blog) - 16:9</option>
+                </select>
 
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <p class="text-gray-600 text-sm">Total Content</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_content }}</p>
+                <button class="btn btn-primary w-100 py-2 fw-bold" id="genBtn" onclick="generateImage()">
+                    <i class="fas fa-paint-brush me-2"></i> Generate HD Image (5 Credits)
+                </button>
             </div>
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <p class="text-gray-600 text-sm">Total Words</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_words }}</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <p class="text-gray-600 text-sm">Avg SEO Score</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">{{ avg_score }}/100</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <p class="text-gray-600 text-sm">AI Requests</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">0/50</p>
-            </div>
-        </div>
 
-        <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
-            <h2 class="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <a href="/keyword-research" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-600">
-                    <i class="fas fa-search text-indigo-600 text-2xl mb-2"></i>
-                    <span class="text-sm">Keyword Research</span>
-                </a>
-                <a href="/article-wizard" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-600">
-                    <i class="fas fa-magic text-purple-600 text-2xl mb-2"></i>
-                    <span class="text-sm">Article Wizard</span>
-                </a>
-                <a href="/sitemap-generator" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-600">
-                    <i class="fas fa-sitemap text-green-600 text-2xl mb-2"></i>
-                    <span class="text-sm">Sitemap</span>
-                </a>
-                <a href="/site-auditor" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-600">
-                    <i class="fas fa-stethoscope text-red-600 text-2xl mb-2"></i>
-                    <span class="text-sm">Site Auditor</span>
+            <div id="resultArea" class="d-none text-center">
+                <img id="outputImg" src="" class="img-fluid rounded shadow-sm mb-3" style="max-height: 500px;">
+                <br>
+                <a id="downloadLink" href="" download="generated-image.png" target="_blank" class="btn btn-outline-dark">
+                    <i class="fas fa-download me-2"></i> Download HD
                 </a>
             </div>
         </div>
-
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <h2 class="text-xl font-bold text-gray-900 mb-6">Recent Content</h2>
-            {% if recent_content %}
-            <div class="space-y-4">
-                {% for content in recent_content %}
-                <div class="p-4 border border-gray-200 rounded-lg">
-                    <h3 class="font-semibold">{{ content.title }}</h3>
-                    <p class="text-sm text-gray-500 mt-2">{{ content.word_count }} words</p>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="text-center py-12">
-                <i class="fas fa-file-alt text-gray-300 text-6xl mb-4"></i>
-                <p class="text-gray-500 text-lg">No content yet</p>
-                <a href="/article-wizard" class="inline-block mt-4 bg-indigo-600 text-white px-6 py-3 rounded-lg">
-                    Create Content
-                </a>
-            </div>
-            {% endif %}
-        </div>
-
     </div>
-</body>
-</html>
+</div>
+<script>
+async function generateImage() {
+    const prompt = document.getElementById('imgPrompt').value;
+    const size = document.getElementById('imgSize').value;
+    
+    if(!prompt) return alert("Enter a prompt");
+    
+    const btn = document.getElementById('genBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating... (Wait 10s)';
+    
+    try {
+        const res = await fetch('/api/generate-image', {
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({prompt: prompt, size: size})
+        });
+        const data = await res.json();
+        if(data.success) {
+            document.getElementById('outputImg').src = data.image_url;
+            document.getElementById('downloadLink').href = data.image_url;
+            document.getElementById('resultArea').classList.remove('d-none');
+        } else {
+            alert(data.error);
+        }
+    } catch(e) { console.error(e); }
+    finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paint-brush me-2"></i> Generate HD Image (5 Credits)'; }
+}
+</script>
+{% endblock %}
