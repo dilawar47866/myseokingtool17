@@ -441,6 +441,9 @@ def robots_generator_page():
 # ==========================================
 # PASSWORD CHANGE ROUTE
 # ==========================================
+ ==========================================
+# PASSWORD CHANGE ROUTE
+# ==========================================
 @app.route('/change-password', methods=['GET', 'POST'])
 @login_required
 def change_password():
